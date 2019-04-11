@@ -55,10 +55,10 @@
 #include <RH_RF69.h>
 
 // change addresses for each client board, any number :)
-#define MY_ADDRESS                    102
+#define MY_ADDRESS                    103
 
 // Where to send packets to!
-#define DEST_ADDRESS                  103
+#define DEST_ADDRESS                  102
 
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RFM69_FREQ                    915.0

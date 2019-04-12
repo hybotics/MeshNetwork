@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 10th, 2019
+  Updated:  April 11th, 2019
 ****************************************************************************/
 
 /*
@@ -44,11 +44,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include "Adafruit_SHT31.h"
+#include <Adafruit_HTU21DF.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_IS31FL3731.h>
+#include <Adafruit_LEDBackpack.h>
 #include <Adafruit_Sensor.h>
-#include "Adafruit_TSL2591.h"
+#include <Adafruit_TSL2591.h>
 
 /********************* RFM69 Radio Setup **************************/
 #include <RHReliableDatagram.h>
@@ -91,13 +91,13 @@ uint8_t rfm69PowerLevel = RFM69_POWER_LEVEL;
 #define DEFAULT_CHAR_WAIT_MS          60
 #define DEFAULT_SCROLL_SPEED_MS       3000
 
-Adafruit_SHT31 sht31d = Adafruit_SHT31();
-Adafruit_IS31FL3731_Wing matrix = Adafruit_IS31FL3731_Wing();
+Adafruit_HTU21DF htu21df = Adafruit_HTU21DF();
+Adafruit_AlphaNum4 alpha4 = Adafruit_AlphaNum4();
 Adafruit_TSL2591 tsl2591 = Adafruit_TSL2591(2591);
 
 // Flags for found and initialized devices
 bool tsl2591Found = true;
-bool sht31Found = true;
+bool htu21Found = true;
 bool is31DisplayFound = true;
 bool rfm69RadioFound = true;
 
@@ -190,11 +190,11 @@ void setup() {
   pinMode(PACKET_LED, OUTPUT);
   pinMode(ERROR_LED, OUTPUT);
   
-  if (sht31d.begin(0x44)) {   // Set to 0x45 for alternate i2c addr
-    Serial.println("The SHT31-D temperature and humidity sensor was found.");
+  if (htu21df.begin()) {
+    Serial.println("The HTU21DF temperature and humidity sensor was found.");
   } else {
-    Serial.println("The SHT31-D temperature and humidity sensor was not found!");
-    sht31Found = false;
+    Serial.println("The HTU21DF temperature and humidity sensor was not found!");
+    htu21Found = false;
   }
   
   if (tsl2591.begin())  {
@@ -208,13 +208,10 @@ void setup() {
     tsl2591Found = false;
   }
 
-  if (matrix.begin()) {
-    Serial.println("The IS31 display controller was found.");
-  } else {
-    Serial.println("The IS31 display controller was not found!");
-    is31DisplayFound = false;
-  }
-    
+  alpha4.begin(0x70);  // pass in the address
+  alpha4.clear();
+  alpha4.writeDisplay();
+      
   if (rfm69_manager.init()) {
     Serial.println("Initialization of the RFM69 radio succeeded.");
  
@@ -263,7 +260,7 @@ uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t data[] = "  OK";
 
 void loop() {
-  bool sht31DataValid = true;
+  bool htu21DataValid = true;
   bool tsl2591DataValid = true;
 
   bool pressed_A, pressed_B, pressed_C = false;
@@ -272,20 +269,20 @@ void loop() {
   blinkLED(ERROR_LED, 50);
   blinkLED(STATUS_LED, 150);
 
-  if (sht31Found) {
-    float celsius = sht31d.readTemperature();
+  if (htu21Found) {
+    float celsius = htu.readTemperature();
     float fahrenheit = (celsius * 9/5) + 32;
-    float humidity = sht31d.readHumidity();
+    float humidity = htu.readHumidity();
 
     double lux = 0.0;
     long luxInt = 0;
   
-    String temperatureStr =  "T=" + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), H=" + String(humidity,  1) + "%";
+    String temperatureStr =  " T=" + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), H=" + String(humidity,  1) + "%";
     String lightStr = "";
     
     if (isnan(celsius)) {  // check if 'is not a number'
       Serial.println("Failed to read the temperature!");
-      sht31DataValid = false;
+      htu21DataValid = false;
     } else { 
       Serial.print("Temperature = ");
       Serial.print(fahrenheit);
@@ -296,7 +293,7 @@ void loop() {
       if (isnan(humidity)) {  // check if 'is not a number'
         Serial.println(""); 
         Serial.println("Failed to read the humidity!");
-        sht31DataValid = false;
+        htu21DataValid = false;
       } else {
         Serial.print(", Humidity = ");
         Serial.print(humidity);
@@ -392,7 +389,7 @@ void loop() {
         //brightness = 8;
 
         // Scroll the temperature and readings across the display
-        if (is31DisplayFound and sht31DataValid) {
+        if (is31DisplayFound and htu21DataValid) {
           printString(matrix, temperatureStr, brightness);
           delay(1000);
           matrix.clear();
@@ -407,7 +404,7 @@ void loop() {
           // Scroll the light level reading and brightness setting across the display
           if (is31DisplayFound and tsl2591DataValid) {
             printString(matrix, lightStr, brightness);         
-            delay(2000);
+            delay(1000);
             matrix.clear();
           } 
         }
@@ -416,9 +413,9 @@ void loop() {
     
     Serial.println();
   } else {
-    Serial.println("There is no SHT31-D sensor to get data from!");
-    sht31Found = false;
-    sht31DataValid = false;
+    Serial.println("There is no HTU21-DF sensor to get data from!");
+    htu21Found = false;
+    htu21DataValid = false;
 
     tsl2591Found = false;
     tsl2591DataValid = false;

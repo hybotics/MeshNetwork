@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 10th, 2019
+  Updated:  April 11th, 2019
 ****************************************************************************/
 
 /*
@@ -44,11 +44,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include "Adafruit_SHT31.h"
+#include <Adafruit_SHT31.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_IS31FL3731.h>
 #include <Adafruit_Sensor.h>
-#include "Adafruit_TSL2591.h"
+#include <Adafruit_TSL2591.h>
 
 /********************* RFM69 Radio Setup **************************/
 #include <RHReliableDatagram.h>

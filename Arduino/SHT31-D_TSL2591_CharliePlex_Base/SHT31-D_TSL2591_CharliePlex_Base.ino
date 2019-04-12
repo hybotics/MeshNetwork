@@ -44,11 +44,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include "Adafruit_SHT31.h"
+#include <Adafruit_SHT31.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_IS31FL3731.h>
 #include <Adafruit_Sensor.h>
-#include "Adafruit_TSL2591.h"
+#include <Adafruit_TSL2591.h>
 
 #define BUTTON_A                      5
 #define BUTTON_B                      6

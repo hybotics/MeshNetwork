@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 11th, 2019
+  Updated:  April 12th, 2019
 ****************************************************************************/
 
 /*
@@ -140,25 +140,34 @@ void blinkLED(uint8_t ledPin, uint8_t waitMS) {
   delay(waitMS);                        // Wait for a period of time in ms
 }
 
-// Scroll a string, up to 21 characters long, across a CharliePlex FeatherWing
-void printString(Adafruit_IS31FL3731_Wing mat, String str, uint8_t brightness = DEFAULT_BRIGHTNESS, uint8_t nrTimes = NUMBER_OF_SCROLL_LOOPS, uint8_t charWaitMS = DEFAULT_CHAR_WAIT_MS, uint8_t scrollDelayMS = DEFAULT_SCROLL_SPEED_MS) {
-  uint8_t strLength = str.length();
+// Scroll a string across a CharliePlex FeatherWing display
+void writeString(Adafruit_AlphaNum4 alpha, String str, uint16_t charWaitMS = 10, uint8_t brightness = 1) {
+  char displaybuffer[4] = {' ', ' ', ' ', ' '};
+  uint16_t index = 0;
+
+  alpha.setBrightness(brightness);
   
-  mat.setTextSize(1);
-  mat.setTextWrap(false);               // We dont want text to wrap so it scrolls nicely
-  mat.setTextColor(brightness);
-
-  for (uint8_t i = 0; i < nrTimes; i++) {
-    for (int16_t x = 0; x >= -(strLength * 6); x--) {
-      mat.clear();
-      mat.setCursor(x, 0);
-      mat.print(str);
-
-      delay(charWaitMS);
+  for (index = 0; index < str.length(); index++) {
+    if (isprint(str[index])) {    
+      // Scroll down display
+      displaybuffer[0] = displaybuffer[1];
+      displaybuffer[1] = displaybuffer[2];
+      displaybuffer[2] = displaybuffer[3];
+      displaybuffer[3] = str[index];
+     
+      // Set every digit to the buffer
+      alpha.writeDigitAscii(0, displaybuffer[0]);
+      alpha.writeDigitAscii(1, displaybuffer[1]);
+      alpha.writeDigitAscii(2, displaybuffer[2]);
+      alpha.writeDigitAscii(3, displaybuffer[3]);
+     
+      // Write it out!
+      alpha.writeDisplay();
+      delay(200);
     }
 
-    delay(scrollDelayMS);
-  }  
+    delay(charWaitMS);
+  }
 }
 
 /*
@@ -270,9 +279,9 @@ void loop() {
   blinkLED(STATUS_LED, 150);
 
   if (htu21Found) {
-    float celsius = htu.readTemperature();
+    float celsius = htu21df.readTemperature();
     float fahrenheit = (celsius * 9/5) + 32;
-    float humidity = htu.readHumidity();
+    float humidity = htu21df.readHumidity();
 
     double lux = 0.0;
     long luxInt = 0;
@@ -389,10 +398,11 @@ void loop() {
         //brightness = 8;
 
         // Scroll the temperature and readings across the display
-        if (is31DisplayFound and htu21DataValid) {
-          printString(matrix, temperatureStr, brightness);
+        if (htu21DataValid) {
+          writeString(alpha4, temperatureStr, 100, brightness);
           delay(1000);
-          matrix.clear();
+          alpha4.clear();
+          alpha4.writeDisplay();
         }
           
         if (tsl2591Found) {
@@ -402,10 +412,11 @@ void loop() {
           Serial.println(lightStr.length());
             
           // Scroll the light level reading and brightness setting across the display
-          if (is31DisplayFound and tsl2591DataValid) {
-            printString(matrix, lightStr, brightness);         
+          if (tsl2591DataValid) {
+            writeString(alpha4, temperatureStr, 100, brightness);
             delay(1000);
-            matrix.clear();
+            alpha4.clear();
+            alpha4.writeDisplay();
           } 
         }
       }

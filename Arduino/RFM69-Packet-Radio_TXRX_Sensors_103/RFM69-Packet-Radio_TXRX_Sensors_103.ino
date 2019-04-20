@@ -98,7 +98,6 @@ Adafruit_TSL2591 tsl2591 = Adafruit_TSL2591(2591);
 // Flags for found and initialized devices
 bool tsl2591Found = true;
 bool htu21Found = true;
-bool is31DisplayFound = true;
 bool rfm69RadioFound = true;
 
 uint8_t brightness = DEFAULT_BRIGHTNESS;
@@ -140,7 +139,7 @@ void blinkLED(uint8_t ledPin, uint8_t waitMS) {
   delay(waitMS);                        // Wait for a period of time in ms
 }
 
-// Scroll a string across a CharliePlex FeatherWing display
+// Scroll a string across a Quad Alphanumeric FeatherWing display
 void writeString(Adafruit_AlphaNum4 alpha, String str, uint16_t charWaitMS = 10, uint8_t brightness = 1) {
   char displaybuffer[4] = {' ', ' ', ' ', ' '};
   uint16_t index = 0;
@@ -192,12 +191,17 @@ void setup() {
   Serial.begin(9600);
   delay(5000);
   
-  Serial.println("Base SHT31-D, TSL2591, and CharliePlex FeatherWing test");
+  Serial.println("RFM69 Radio, HTU21-DF, and Quad Alphanumeric FeatherWing test");
   Serial.println("");
 
   // Initialize digital pins for LED outputs and button inputs.
   pinMode(PACKET_LED, OUTPUT);
   pinMode(ERROR_LED, OUTPUT);
+  pinMode(STATUS_LED, OUTPUT);
+    
+  pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
   
   if (htu21df.begin()) {
     Serial.println("The HTU21DF temperature and humidity sensor was found.");
@@ -286,7 +290,7 @@ void loop() {
     double lux = 0.0;
     long luxInt = 0;
   
-    String temperatureStr =  " T=" + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), H=" + String(humidity,  1) + "%";
+    String temperatureStr =  " " + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), " + String(humidity,  1) + "%";
     String lightStr = "";
     
     if (isnan(celsius)) {  // check if 'is not a number'
@@ -380,7 +384,7 @@ void loop() {
           Serial.println(brightness);
 
           if (lux > 0.0) {
-            lightStr = "L=" + String(luxInt) + " lux, B=" + String(brightness);
+            lightStr = " " + String(luxInt) + " lux, " + String(brightness);
           } else {
             tsl2591DataValid = false;
           }
@@ -413,7 +417,7 @@ void loop() {
             
           // Scroll the light level reading and brightness setting across the display
           if (tsl2591DataValid) {
-            writeString(alpha4, temperatureStr, 100, brightness);
+            writeString(alpha4, lightStr, 100, brightness);
             delay(1000);
             alpha4.clear();
             alpha4.writeDisplay();

@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 12th, 2019
+  Updated:  April 19th, 2019
 ****************************************************************************/
 
 /*
@@ -87,7 +87,7 @@ uint8_t rfm69PowerLevel = RFM69_POWER_LEVEL;
 #define STATUS_LED                    12
 
 #define DEFAULT_BRIGHTNESS            1
-#define NUMBER_OF_SCROLL_LOOPS        2
+#define NUMBER_OF_SCROLL_LOOPS        1
 #define DEFAULT_CHAR_WAIT_MS          60
 #define DEFAULT_SCROLL_SPEED_MS       3000
 
@@ -106,6 +106,20 @@ uint8_t brightness = DEFAULT_BRIGHTNESS;
 /****************************************************************
   These utility routines make this node go round and round.
 ****************************************************************/
+
+void fadeLED(uint8_t pin, uint8_t delayMS) {
+  // Fade the LED on pin from off to brightest:
+  for (int brightness = 0; brightness < 255; brightness++) {
+    analogWrite(pin, brightness);
+    delay(delayMS);
+  }
+
+  // Fade the LED on pin from brightest to off:
+  for (int brightness = 255; brightness >= 0; brightness--) {
+    analogWrite(pin, brightness);
+    delay(delayMS);
+  }
+}
 
 // Round a float or double to an integer
 int16_t roundToInt(double x) {
@@ -165,7 +179,7 @@ void printString(Adafruit_IS31FL3731_Wing mat, String str, uint8_t brightness = 
     Performs a read using the Adafruit Unified Sensor API.
 */
 double lightLevel(void) {
-  /* Get a new sensor event */ 
+  // Get a new sensor event
   sensors_event_t event;
   tsl2591.getEvent(&event);
 
@@ -183,12 +197,17 @@ void setup() {
   Serial.begin(9600);
   delay(5000);
   
-  Serial.println("Base SHT31-D, TSL2591, and CharliePlex FeatherWing test");
+  Serial.println("RFM69 Radio, SHT31-D, TSL2591, and CharliePlex FeatherWing test");
   Serial.println("");
 
   // Initialize digital pins for LED outputs and button inputs.
   pinMode(PACKET_LED, OUTPUT);
   pinMode(ERROR_LED, OUTPUT);
+  pinMode(STATUS_LED, OUTPUT);
+    
+  pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
   
   if (sht31d.begin(0x44)) {   // Set to 0x45 for alternate i2c addr
     Serial.println("The SHT31-D temperature and humidity sensor was found.");
@@ -268,20 +287,120 @@ void loop() {
 
   bool pressed_A, pressed_B, pressed_C = false;
 
-  blinkLED(PACKET_LED, 50);
-  blinkLED(ERROR_LED, 50);
-  blinkLED(STATUS_LED, 150);
+  blinkLED(PACKET_LED, 25);
+  delay(500);
+  
+  fadeLED(ERROR_LED, 1);
+  fadeLED(STATUS_LED, 1);
+
+  if (tsl2591Found) {
+    double lux = 0.0;
+    long luxInt = 0;
+  
+    String lightStr = "";
+
+    // Get the light level reading and try to set the display brightness
+    if (tsl2591Found) {
+      // Check the light level and adjust the display brightness
+      lux = lightLevel();
+      luxInt = roundToInt(lux);
+
+      if (lux > 0.0) {
+        Serial.println("  ***   Setting the display brightness   ***");
+      }
+            
+      if (lux <= -3.14) {
+        luxInt = 0;
+        brightness = 100;
+        tsl2591DataValid = false;
+        lightStr = "Unable to set brightness!";
+      } else if (luxInt <= 20) {
+        brightness = 1;
+      } else if ((luxInt > 20) and (luxInt <= 30)) {
+        brightness = 2;
+      } else if ((luxInt > 30) and (luxInt <= 70)) {
+        brightness = 4;
+      } else if ((luxInt > 70) and (luxInt <= 120)) {
+        brightness = 6;
+     } else if ((luxInt > 120) and (luxInt <= 250)) {
+        brightness = 12;
+      } else if ((luxInt > 250) and (luxInt <= 350)) {
+        brightness = 15;
+      } else if ((luxInt > 350) and (luxInt <= 450)) {
+        brightness = 18;
+      } else if ((luxInt > 450) and (luxInt <= 550)) {
+        brightness = 20;
+      } else if ((luxInt > 550) and (luxInt <= 650)) {
+        brightness = 25;
+      } else if ((luxInt > 650) and (luxInt <= 750)) {
+        brightness = 30;
+      } else if ((luxInt > 750) and (luxInt <= 850)) {
+        brightness = 35;
+      } else if ((luxInt > 850) and (luxInt <= 950)) {
+        brightness = 40;
+      } else if ((luxInt > 950) and (luxInt <= 1050)) {
+        brightness = 45;
+      } else if ((luxInt > 1050) and (luxInt <= 1150)) {
+        brightness = 50;
+      } else if ((luxInt > 1150) and (luxInt <= 1250)) {
+        brightness = 55;
+      } else if ((luxInt > 1250) and (luxInt <= 1350)) {
+        brightness = 60;
+      } else if ((luxInt > 1350) and (luxInt <= 1450)) {
+        brightness = 65;
+      } else if ((luxInt > 1450) and (luxInt <= 1550)) {
+        brightness = 70;
+      } else if ((luxInt > 1550) and (luxInt <= 1650)) {
+        brightness = 80;
+      } else if ((luxInt > 1650) and (luxInt <= 1750)) {
+        brightness = 90;
+      } else if ((luxInt > 1750) and (luxInt <= 1850)) {
+        brightness = 100;
+      } else if ((luxInt > 1850) and (luxInt <= 2000)) {
+        brightness = 110;
+      } else if ((luxInt > 2000) and (luxInt <= 2400)) {
+        brightness = 120;
+      } else if (luxInt > 2400) {
+        brightness = 130;
+      }
+
+      Serial.print("Light level = ");
+      Serial.print(lux, DEC);
+      Serial.print(" lux");
+      Serial.print(", Brightness = ");
+      Serial.println(brightness);
+
+      if (lux > 0.0) {
+        lightStr = "L=" + String(luxInt) + " lux, B=" + String(brightness);
+      } else {
+        tsl2591DataValid = false;
+      }
+    } else {
+      tsl2591DataValid = false;
+      Serial.println("Unable to automatically set brightness for the display!");
+    }
+
+    if (tsl2591DataValid) {
+      Serial.print("Light = '");
+      Serial.print(lightStr);
+      Serial.print("', Length = ");
+      Serial.println(lightStr.length());
+            
+      // Scroll the light level reading and brightness setting across the display
+      if (is31DisplayFound and tsl2591DataValid) {
+        printString(matrix, lightStr, brightness);         
+        delay(1000);
+        matrix.clear();
+      } 
+    }
+  }
 
   if (sht31Found) {
     float celsius = sht31d.readTemperature();
     float fahrenheit = (celsius * 9/5) + 32;
     float humidity = sht31d.readHumidity();
 
-    double lux = 0.0;
-    long luxInt = 0;
-  
     String temperatureStr =  "T=" + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), H=" + String(humidity,  1) + "%";
-    String lightStr = "";
     
     if (isnan(celsius)) {  // check if 'is not a number'
       Serial.println("Failed to read the temperature!");
@@ -301,88 +420,7 @@ void loop() {
         Serial.print(", Humidity = ");
         Serial.print(humidity);
         Serial.println("\%");
-       
-        // Get the light level reading and try to set the display brightness
-        if (tsl2591Found) {
-          // Check the light level and adjust the display brightness
-          lux = lightLevel();
-          luxInt = roundToInt(lux);
-
-          if (lux > 0.0) {
-            Serial.println("  ***   Setting the display brightness   ***");
-          }
-            
-          if (lux <= -3.14) {
-            luxInt = 0;
-            brightness = 100;
-            tsl2591DataValid = false;
-            lightStr = "Unable to set brightness!";
-          } else if (luxInt <= 20) {
-            brightness = 1;
-          } else if ((luxInt > 20) and (luxInt <= 30)) {
-            brightness = 3;
-          } else if ((luxInt > 30) and (luxInt <= 70)) {
-            brightness = 6;
-          } else if ((luxInt > 70) and (luxInt <= 120)) {
-            brightness = 9;
-          } else if ((luxInt > 120) and (luxInt <= 250)) {
-            brightness = 12;
-          } else if ((luxInt > 250) and (luxInt <= 350)) {
-            brightness = 15;
-          } else if ((luxInt > 350) and (luxInt <= 450)) {
-            brightness = 18;
-          } else if ((luxInt > 450) and (luxInt <= 550)) {
-            brightness = 20;
-          } else if ((luxInt > 550) and (luxInt <= 650)) {
-            brightness = 25;
-          } else if ((luxInt > 650) and (luxInt <= 750)) {
-            brightness = 30;
-          } else if ((luxInt > 750) and (luxInt <= 850)) {
-            brightness = 35;
-          } else if ((luxInt > 850) and (luxInt <= 950)) {
-            brightness = 40;
-          } else if ((luxInt > 950) and (luxInt <= 1050)) {
-            brightness = 45;
-          } else if ((luxInt > 1050) and (luxInt <= 1150)) {
-            brightness = 50;
-          } else if ((luxInt > 1150) and (luxInt <= 1250)) {
-            brightness = 55;
-          } else if ((luxInt > 1250) and (luxInt <= 1350)) {
-            brightness = 60;
-          } else if ((luxInt > 1350) and (luxInt <= 1450)) {
-            brightness = 65;
-          } else if ((luxInt > 1450) and (luxInt <= 1550)) {
-            brightness = 70;
-          } else if ((luxInt > 1550) and (luxInt <= 1650)) {
-            brightness = 80;
-          } else if ((luxInt > 1650) and (luxInt <= 1750)) {
-            brightness = 90;
-          } else if ((luxInt > 1750) and (luxInt <= 1850)) {
-            brightness = 100;
-          } else if ((luxInt > 1850) and (luxInt <= 2000)) {
-            brightness = 110;
-          } else if ((luxInt > 2000) and (luxInt <= 2400)) {
-            brightness = 120;
-          } else if (luxInt > 2400) {
-            brightness = 130;
-          }
-
-          Serial.print("Light level = ");
-          Serial.print(lux, DEC);
-          Serial.print(" lux");
-          Serial.print(", Brightness = ");
-          Serial.println(brightness);
-
-          if (lux > 0.0) {
-            lightStr = "L=" + String(luxInt) + " lux, B=" + String(brightness);
-          } else {
-            tsl2591DataValid = false;
-          }
-        } else {
-          tsl2591DataValid = false;
-          Serial.println("Unable to automatically set brightness for the display!");
-        }
-          
+         
         Serial.print("Temperature = '");
         Serial.print(temperatureStr);
         Serial.print("', Length = ");
@@ -398,19 +436,6 @@ void loop() {
           matrix.clear();
         }
           
-        if (tsl2591Found) {
-          Serial.print("Light = '");
-          Serial.print(lightStr);
-          Serial.print("', Length = ");
-          Serial.println(lightStr.length());
-            
-          // Scroll the light level reading and brightness setting across the display
-          if (is31DisplayFound and tsl2591DataValid) {
-            printString(matrix, lightStr, brightness);         
-            delay(2000);
-            matrix.clear();
-          } 
-        }
       }
     }
     

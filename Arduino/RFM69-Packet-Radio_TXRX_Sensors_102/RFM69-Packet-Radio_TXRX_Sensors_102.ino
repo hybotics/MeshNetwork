@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 19th, 2019
+  Updated:  April 23rd, 2019
 ****************************************************************************/
 
 /*
@@ -86,7 +86,7 @@ uint8_t rfm69PowerLevel = RFM69_POWER_LEVEL;
 #define ERROR_LED                     11
 #define STATUS_LED                    12
 
-#define DEFAULT_BRIGHTNESS            1
+#define DEFAULT_BRIGHTNESS            2
 #define NUMBER_OF_SCROLL_LOOPS        1
 #define DEFAULT_CHAR_WAIT_MS          60
 #define DEFAULT_SCROLL_SPEED_MS       3000
@@ -103,23 +103,11 @@ bool rfm69RadioFound = true;
 
 uint8_t brightness = DEFAULT_BRIGHTNESS;
 
+bool pressed_A, pressed_B, pressed_C = false;
+
 /****************************************************************
   These utility routines make this node go round and round.
 ****************************************************************/
-
-void fadeLED(uint8_t pin, uint8_t delayMS) {
-  // Fade the LED on pin from off to brightest:
-  for (int brightness = 0; brightness < 255; brightness++) {
-    analogWrite(pin, brightness);
-    delay(delayMS);
-  }
-
-  // Fade the LED on pin from brightest to off:
-  for (int brightness = 255; brightness >= 0; brightness--) {
-    analogWrite(pin, brightness);
-    delay(delayMS);
-  }
-}
 
 // Round a float or double to an integer
 int16_t roundToInt(double x) {
@@ -143,6 +131,20 @@ int16_t roundToInt(double x) {
        x += 1.0;
 
      return int(-x);
+  }
+}
+
+void fadeBlinkLED(uint8_t pin, uint8_t delayMS) {
+  // Fade the LED on pin from off to brightest:
+  for (int brightness = 0; brightness < 255; brightness++) {
+    analogWrite(pin, brightness);
+    delay(delayMS);
+  }
+
+  // Fade the LED on pin from brightest to off:
+  for (int brightness = 255; brightness >= 0; brightness--) {
+    analogWrite(pin, brightness);
+    delay(delayMS);
   }
 }
 
@@ -193,6 +195,17 @@ double lightLevel(void) {
   }
 }
 
+void button_a_isr(void) {
+  pressed_A = true; 
+}
+
+void button_b_isr(void) {
+  pressed_B = true; 
+}
+
+void button_c_isr(void) {
+  pressed_C = true; 
+}
 void setup() {
   Serial.begin(9600);
   delay(5000);
@@ -208,6 +221,10 @@ void setup() {
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(BUTTON_A), button_a_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_B), button_b_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_C), button_c_isr, FALLING);
   
   if (sht31d.begin(0x44)) {   // Set to 0x45 for alternate i2c addr
     Serial.println("The SHT31-D temperature and humidity sensor was found.");
@@ -285,13 +302,11 @@ void loop() {
   bool sht31DataValid = true;
   bool tsl2591DataValid = true;
 
-  bool pressed_A, pressed_B, pressed_C = false;
-
   blinkLED(PACKET_LED, 25);
   delay(500);
   
-  fadeLED(ERROR_LED, 1);
-  fadeLED(STATUS_LED, 1);
+  fadeBlinkLED(ERROR_LED, 1);
+  blinkLED(STATUS_LED, 200);
 
   if (tsl2591Found) {
     double lux = 0.0;
@@ -314,20 +329,20 @@ void loop() {
         brightness = 100;
         tsl2591DataValid = false;
         lightStr = "Unable to set brightness!";
-      } else if (luxInt <= 20) {
-        brightness = 1;
-      } else if ((luxInt > 20) and (luxInt <= 30)) {
+      } else if ((luxInt >= 0) and (luxInt <= 20)) {
         brightness = 2;
+      } else if ((luxInt > 20) and (luxInt <= 30)) {
+        brightness = 3;
       } else if ((luxInt > 30) and (luxInt <= 70)) {
         brightness = 4;
       } else if ((luxInt > 70) and (luxInt <= 120)) {
         brightness = 6;
-     } else if ((luxInt > 120) and (luxInt <= 250)) {
-        brightness = 12;
+      } else if ((luxInt > 120) and (luxInt <= 250)) {
+        brightness = 9;
       } else if ((luxInt > 250) and (luxInt <= 350)) {
-        brightness = 15;
+        brightness = 12;
       } else if ((luxInt > 350) and (luxInt <= 450)) {
-        brightness = 18;
+        brightness = 15;
       } else if ((luxInt > 450) and (luxInt <= 550)) {
         brightness = 20;
       } else if ((luxInt > 550) and (luxInt <= 650)) {
@@ -371,7 +386,7 @@ void loop() {
       Serial.println(brightness);
 
       if (lux > 0.0) {
-        lightStr = "L=" + String(luxInt) + " lux, B=" + String(brightness);
+        lightStr = "L = " + String(luxInt) + " lux, B = " + String(brightness);
       } else {
         tsl2591DataValid = false;
       }
@@ -400,7 +415,7 @@ void loop() {
     float fahrenheit = (celsius * 9/5) + 32;
     float humidity = sht31d.readHumidity();
 
-    String temperatureStr =  "T=" + String(roundToInt(fahrenheit)) + "F(" + String(roundToInt(celsius)) + "C), H=" + String(humidity,  1) + "%";
+    String temperatureStr =  "T = " + String(fahrenheit, 1) + " F (" + String(celsius, 1) + " C), H = " + String(humidity, 1) + "%";
     
     if (isnan(celsius)) {  // check if 'is not a number'
       Serial.println("Failed to read the temperature!");
@@ -449,13 +464,13 @@ void loop() {
     tsl2591DataValid = false;
   }
 
-  Serial.println("You have 5 seconds to push and hold the button(s).");
-  delay(5000);
+  //Serial.println("You have 5 seconds to push and hold the button(s).");
+  //delay(5000);
   
   // Read the push buttons - active LOW
-  pressed_A = (digitalRead(BUTTON_A) == LOW);
-  pressed_B = (digitalRead(BUTTON_B) == LOW);
-  pressed_C = (digitalRead(BUTTON_C) == LOW);
+  //pressed_A = (digitalRead(BUTTON_A) == LOW);
+  //pressed_B = (digitalRead(BUTTON_B) == LOW);
+  //pressed_C = (digitalRead(BUTTON_C) == LOW);
 
   Serial.print("(1) Buttons: A = ");
   Serial.print(pressed_A?"Pressed":"Not pressed");

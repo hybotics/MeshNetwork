@@ -513,19 +513,22 @@ void loop() {
       }
     }
 
-    if (pressed_A || pressed_B || pressed_C) {
-      String sw_A = (pressed_A?"On":"Off");
-      String sw_B = (pressed_B?"On":"Off");
-      String sw_C = (pressed_C?"On":"Off");
-      String switchStr = "A = " + sw_A + ", B = " + sw_B + ", C = " + sw_C;
+    if (pressed_A || pressed_B || pressed_C) {      
       
-      Serial.print("Switches: ");
-      Serial.print(switchStr);
-      Serial.print(", Length = ");
-      Serial.println(switchStr.length());
+      if (is31DisplayFound) {
+        String sw_A = (pressed_A?"On":"Off");
+        String sw_B = (pressed_B?"On":"Off");
+        String sw_C = (pressed_C?"On":"Off");
+        String buttonStr = "A = " + sw_A + ", B = " + sw_B + ", C = " + sw_C;
       
-      printString(matrix, switchStr, brightness);
+        printString(matrix, buttonStr, brightness);
 
+        Serial.print("Buttons: '");
+        Serial.print(buttonStr);
+        Serial.print("', Length = ");
+        Serial.println(buttonStr.length());
+      }
+  
       char radiopacket[20] = "Buttons:";
 
       Serial.println("Button(s) were pressed!");

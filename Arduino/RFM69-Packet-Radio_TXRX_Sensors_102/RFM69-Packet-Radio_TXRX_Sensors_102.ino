@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 23rd, 2019
+  Updated:  April 25rd, 2019
 ****************************************************************************/
 
 /*
@@ -222,10 +222,12 @@ void setup() {
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
 
+  // Initialize interrupts for the buttons
   attachInterrupt(digitalPinToInterrupt(BUTTON_A), button_a_isr, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_B), button_b_isr, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_C), button_c_isr, FALLING);
-  
+
+  // Initialize the SHT31-D temperature and humidity sensor
   if (sht31d.begin(0x44)) {   // Set to 0x45 for alternate i2c addr
     Serial.println("The SHT31-D temperature and humidity sensor was found.");
   } else {
@@ -233,6 +235,7 @@ void setup() {
     sht31Found = false;
   }
   
+  // Initialize the TSL2591 light sensor
   if (tsl2591.begin())  {
     Serial.println(F("The TSL2591 light sensor was found."));
 
@@ -244,6 +247,7 @@ void setup() {
     tsl2591Found = false;
   }
 
+  // Initualize the IS31 CharliePlexed matrix display
   if (matrix.begin()) {
     Serial.println("The IS31 display controller was found.");
   } else {
@@ -251,6 +255,7 @@ void setup() {
     is31DisplayFound = false;
   }
     
+  // Initialize the RFM69 packet radio
   if (rfm69_manager.init()) {
     Serial.println("Initialization of the RFM69 radio succeeded.");
  
@@ -303,7 +308,6 @@ void loop() {
   bool tsl2591DataValid = true;
 
   blinkLED(PACKET_LED, 25);
-  delay(500);
   
   fadeBlinkLED(ERROR_LED, 1);
   blinkLED(STATUS_LED, 200);
@@ -450,7 +454,6 @@ void loop() {
           delay(1000);
           matrix.clear();
         }
-          
       }
     }
     
@@ -463,14 +466,6 @@ void loop() {
     tsl2591Found = false;
     tsl2591DataValid = false;
   }
-
-  //Serial.println("You have 5 seconds to push and hold the button(s).");
-  //delay(5000);
-  
-  // Read the push buttons - active LOW
-  //pressed_A = (digitalRead(BUTTON_A) == LOW);
-  //pressed_B = (digitalRead(BUTTON_B) == LOW);
-  //pressed_C = (digitalRead(BUTTON_C) == LOW);
 
   Serial.print("(1) Buttons: A = ");
   Serial.print(pressed_A?"Pressed":"Not pressed");
@@ -519,6 +514,18 @@ void loop() {
     }
 
     if (pressed_A || pressed_B || pressed_C) {
+      String sw_A = (pressed_A?"On":"Off");
+      String sw_B = (pressed_B?"On":"Off");
+      String sw_C = (pressed_C?"On":"Off");
+      String switchStr = "A = " + sw_A + ", B = " + sw_B + ", C = " + sw_C;
+      
+      Serial.print("Switches: ");
+      Serial.print(switchStr);
+      Serial.print(", Length = ");
+      Serial.println(switchStr.length());
+      
+      printString(matrix, switchStr, brightness);
+
       char radiopacket[20] = "Buttons:";
 
       Serial.println("Button(s) were pressed!");
@@ -566,16 +573,6 @@ void loop() {
           Serial.println((char*)buf);
           Serial.print("RSSI: ");
           Serial.println(rfm69.lastRssi());
-
-  /*
-          oled.clearDisplay();
-          oled.setCursor(0,0);
-          oled.print("Reply:");
-          oled.println((char*)buf);
-          oled.print("RSSI: ");
-          oled.print(rfm69.lastRssi());
-          oled.display(); 
-  */        
         } else {
           Serial.println("No reply, is anyone listening?");
         }

@@ -30,7 +30,7 @@
 
   Author:   Dale Weber <hybotics@hybotics.org>
   Date:     March 15th, 2019
-  Updated:  April 25rd, 2019
+  Updated:  April 29th, 2019
 ****************************************************************************/
 
 /*
@@ -86,9 +86,17 @@ uint8_t rfm69PowerLevel = RFM69_POWER_LEVEL;
 #define ERROR_LED                     11
 #define STATUS_LED                    12
 
+/* 
+  These are the same as the PACKET, STATUS, and ERROR LEDs now,
+    but they might be different in the future.
+*/
+#define LED_A                         PACKET_LED
+#define LED_B                         STATUS_LED
+#define LED_C                         ERROR_LED
+
 #define DEFAULT_BRIGHTNESS            2
 #define NUMBER_OF_SCROLL_LOOPS        1
-#define DEFAULT_CHAR_WAIT_MS          60
+#define DEFAULT_CHAR_WAIT_MS          50
 #define DEFAULT_SCROLL_SPEED_MS       3000
 
 Adafruit_SHT31 sht31d = Adafruit_SHT31();
@@ -206,6 +214,7 @@ void button_b_isr(void) {
 void button_c_isr(void) {
   pressed_C = true; 
 }
+
 void setup() {
   Serial.begin(9600);
   delay(5000);
@@ -217,7 +226,12 @@ void setup() {
   pinMode(PACKET_LED, OUTPUT);
   pinMode(ERROR_LED, OUTPUT);
   pinMode(STATUS_LED, OUTPUT);
-    
+
+  /* Only needed when they are separate LEDs */
+  //pinMode(LED_A, OUTPUT);
+  //pinMode(LED_B, OUTPUT);
+  //pinMode(LED_C, OUTPUT);
+
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -308,9 +322,9 @@ void loop() {
   bool tsl2591DataValid = true;
 
   blinkLED(PACKET_LED, 25);
-  
-  fadeBlinkLED(ERROR_LED, 1);
   blinkLED(STATUS_LED, 200);
+
+  fadeBlinkLED(ERROR_LED, 1);
 
   if (tsl2591Found) {
     double lux = 0.0;
@@ -390,7 +404,7 @@ void loop() {
       Serial.println(brightness);
 
       if (lux > 0.0) {
-        lightStr = "L = " + String(luxInt) + " lux, B = " + String(brightness);
+        lightStr = "Light level = " + String(luxInt) + " lux, Brightness = " + String(brightness);
       } else {
         tsl2591DataValid = false;
       }
@@ -419,7 +433,7 @@ void loop() {
     float fahrenheit = (celsius * 9/5) + 32;
     float humidity = sht31d.readHumidity();
 
-    String temperatureStr =  "T = " + String(fahrenheit, 1) + " F (" + String(celsius, 1) + " C), H = " + String(humidity, 1) + "%";
+    String temperatureStr =  "Temperature = " + String(fahrenheit, 1) + " F (" + String(celsius, 1) + " C), Humidity = " + String(humidity, 1) + "%";
     
     if (isnan(celsius)) {  // check if 'is not a number'
       Serial.println("Failed to read the temperature!");
@@ -488,7 +502,7 @@ void loop() {
         Serial.print(from, HEX);
         Serial.print(": '");
         Serial.print((char*)buf);
-        Serial.print("', RSSI: ");
+        Serial.print("', RSSI: ");        
         Serial.println(rfm69.lastRssi(), DEC);
 
         // Echo last button       
@@ -514,7 +528,18 @@ void loop() {
     }
 
     if (pressed_A || pressed_B || pressed_C) {      
-      
+      if (pressed_A) {
+        blinkLED(LED_A, 100);
+      }
+
+      if (pressed_B) {
+        blinkLED(LED_B, 100);
+      }
+
+      if (pressed_C) {
+        blinkLED(LED_C, 100);
+      }
+
       if (is31DisplayFound) {
         String sw_A = (pressed_A?"On":"Off");
         String sw_B = (pressed_B?"On":"Off");

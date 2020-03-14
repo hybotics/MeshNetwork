@@ -9,6 +9,8 @@ DEBUG = True
 PIN_ONBOARD_LED = board.D13
 PIN_PACKET_LED = board.D2                                                                                                                                                                                                                                                                                                                                              
 
+SEND_PACKET_INTERVAL_MIN = 2.0
+
 SPI_SCK = board.SCK
 SPI_MISO = board.MISO
 SPI_MOSI = board.MOSI
@@ -44,6 +46,13 @@ import adafruit_lsm303dlh_mag
 
 import adafruit_rfm69
 
+def millis():
+	return time() * 1000
+
+def minutes(start, decimal=0):
+	#	60 seconds * 1000 ms = 1 minute
+	return round((millis() - start) / 60000, decimal)
+
 def blinkLED(led, wait=0.2, cycles=1):
 	for cy in range(cycles):
 		led.value = True
@@ -75,7 +84,6 @@ def unpack(st):
 	for index in range(len(st)):
 		n = n + (ord(st[index]) << (8 * (len(st) - index - 1)))
 
-	return n
 	return n
 
 #	Convert anglular data to degrees
@@ -201,6 +209,8 @@ sequenceNumber = 0
 ackPacketsReceived = 0
 acknowledged = True
 
+startSendMillis = millis()
+
 print()
 
 while True:
@@ -211,8 +221,11 @@ while True:
         print("Loop #{0:6d}".format(loopCount))
         print()
 
+    currentSendMinutes = minutes(startSendMillis, 1)
+
     #   Put RFM69 radio stuff here
-    if acknowledged:
+    if acknowledged or currentSendMinutes >= SEND_PACKET_INTERVAL_MIN:
+        startSendMillis = millis()
         packetSentCount += 1
         toNodeAddress = 103
 
@@ -263,17 +276,26 @@ while True:
         receivedPacket = True
         packetReceivedCount += 1
         packetReceivedLED.value = True
-        # Print out the raw bytes of the packet:
 
-        if DEBUG:
-            print("packet[0:4] = '{0}', packet[4:6] = '{1}', packet[6:] = '{2}'".format(packet[0:4], packet[4:6], packet[6:]))
+        packetNumberIn = unpack(packet[0:4])
+        fromNodeAddress = unpack(outPacket[4:6])
+        typeIn = unpack(outPacket[8:9])
+        
+        if typeIn == 1:
+            #   Standard Packet
+            payloadIn = packet[12:]
+        elif typeIn == 2:
+            #   Acknowledgement Packet
+            payloadIn = packet[9:]
 
-        if packet.find("ACK") and packetNumberIn == packetSentCount:
-            #   ACK packet
+        payloadInText = str(payloadIn, 'ASCII')
+
+        if payloadInText == "ACK":
+            #   Acknowledgement Packet
             acknowledged = True
             print("Received ACK of packet {0} from node {1}".format(packetNumberIn, fromNodeAddress))
         else:
-            #   New packet
+            #   New Packet
             print("Received new packet #{0} (raw bytes): '{1}', from node {2}".format(packetNumberIn, packet, fromNodeAddress))
             # And decode to ASCII text and print it too.  Note that you always
             # receive raw bytes and need to convert to a text format like ASCII
@@ -284,24 +306,20 @@ while True:
             #   Add packet validation here
             #
 
-            #   Unpack the packet
-            sequenceNumberIn = unpack(outPacket[0:4])
-            fromNodeAddress = unpack(outPacket[4:6])
-            toNodeAddress = unpack(outPacket[6:8])
-            packetLenthIn = unpack(outPacket[8:9])
-            totalPacketsIn = unpack(outPacket[9:10])
-            subPacketNumberIn = unpack(outPacket[10:11])
-            payloadIn = outPacket[11:]
-
-            #   Decode the payload
-            payload_text = str(payloadIn, 'ASCII')
-            print("Received (ASCII): '{0}'".format(payloadIn_text))
+            #   Finish unpacking the packet
+            if typeIn == 1:
+                toNodeAddress = unpack(outPacket[6:8])
+                packetLenthIn = unpack(outPacket[9:10])
+                totalPacketsIn = unpack(outPacket[10:11])
+                subPacketNumberIn = unpack(outPacket[11:12])
+                print("Received (ASCII): '{0}'".format(payloadITtext))
 
             sleep(0.2)
 
-            #   ACK the packet
-            ackPacket = pack(packetNumberIn) + pack(RFM69_NETWORK_NODE, 2) + "ACK"
-            rfm69.send(bytes(ackPacket, "utf-8"))
+            if typeIn != 2:
+                #   ACK the packet
+                ackPacket = pack(packetNumberIn) + pack(RFM69_NETWORK_NODE, 2) + pack(fromNodeAddress, 2) + pack(2, 1) + "ACK"
+                rfm69.send(bytes(ackPacket, "utf-8"))
     
     lsm_acc_x, lsm_acc_y, lsm_acc_z = lsmAcc.acceleration
     lsm_mag_x, lsm_mag_y, lsm_mag_z = lsmMag.magnetic

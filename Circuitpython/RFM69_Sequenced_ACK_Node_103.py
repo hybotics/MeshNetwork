@@ -15,8 +15,6 @@ SPI_MOSI = board.MOSI
 
 RFM69_CS = DigitalInOut(board.D4)
 RFM69_RST = DigitalInOut(board.D5)
-
-#   Change this to your node's network address
 RFM69_NETWORK_NODE = 103
 
 #   Frequency of the radio in Mhz. Must match your
@@ -114,12 +112,22 @@ while True:
     #   Put RFM69 radio stuff here
     if acknowledged:
         packetSentCount += 1
+        toNodeAddress = 102
 
+        #   Pack the packet
         packedSequence = pack(packetSentCount, 4)
-        packedNode = pack(RFM69_NETWORK_NODE, 2)
-        outPacket = packedSequence + packedNode + "Hello Node 102"
-        
-        print('Sending {0:4d} "Hello Node 102" message!'.format(packetSentCount))
+        packedFromNode = pack(RFM69_NETWORK_NODE, 2)
+        packedToNode = pack(toNodeAddress, 2)
+        packedTotalPackets = pack(25, 1)
+        packedSubPacketNumber = pack(12, 1)
+        payload = "Hello node {0}".format(103)
+        packedPacketLength = pack(len(packedSequence) + len(packedFromNode) + len(packedToNode) + len(packedTotalPackets) + len(packedSubPacketNumber) + len(payload) + 1, 1)
+
+        packetHeader = packedSequence + packedFromNode + packedToNode + packedPacketLength + packedTotalPackets + packedSubPacketNumber
+
+        outPacket = packetHeader + payload
+       
+        print("Sending {0:4d} '{1}' message!".format(packetSentCount, payload))
         ##("Sending" if receivedPacket else "ReSending"), packetSentCount))
         #rfm69.send(bytes("Hello World #{0}\r\n".format(packetSentCount), "utf-8"))
         rfm69.send(bytes(outPacket, "utf-8"))
@@ -174,12 +182,22 @@ while True:
             # if you intend to do string processing on your data.  Make sure the
             # sending side is sending ASCII data before you try to decode!
 
+            #   Unpack the packet
+            sequenceNumberIn = unpack(outPacket[0:4])
+            fromNodeAddress = unpack(outPacket[4:6])
+            toNodeAddress = unpack(outPacket[6:8])
+            packetLenthIn = unpack(outPacket[8:9])
+            totalPacketsIn = unpack(outPacket[9:10])
+            subPacketNumberIn = unpack(outPacket[10:11])
+            payloadIn = outPacket[11:]
+
             #
             #   Add packet validation here
             #
 
-            packet_text = str(packet, 'ASCII')
-            print("Received (ASCII): '{0}'".format(packet_text))
+            #   Decode the payload
+            payload_text = str(payloadIn, 'ASCII')
+            print("Received (ASCII): '{0}'".format(payloadIn_text))
 
             sleep(0.2)
 

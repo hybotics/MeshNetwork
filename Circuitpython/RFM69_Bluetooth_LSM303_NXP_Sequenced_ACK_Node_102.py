@@ -214,10 +214,20 @@ while True:
     #   Put RFM69 radio stuff here
     if acknowledged:
         packetSentCount += 1
+        toNodeAddress = 103
 
+        #   Pack the packet
         packedSequence = pack(packetSentCount, 4)
-        packedNode = pack(RFM69_NETWORK_NODE, 2)
-        outPacket = packedSequence + packedNode + "Hello Node 103"
+        packedFromNode = pack(RFM69_NETWORK_NODE, 2)
+        packedToNode = pack(toNodeAddress, 2)
+        packedTotalPackets = pack(25, 1)
+        packedSubPacketNumber = pack(12, 1)
+        payload = "Hello node {0}".format(toNodeAddress)
+        packedPacketLength = pack(len(packedSequence) + len(packedFromNode) + len(packedToNode) + len(packedTotalPackets) + len(packedSubPacketNumber) + len(payload) + 1, 1)
+
+        packetHeader = packedSequence + packedFromNode + packedToNode + packedPacketLength + packedTotalPackets + packedSubPacketNumber
+
+        outPacket = packetHeader + payload
         
         print('Sending {0:4d} "Hello Node 103" message!'.format(packetSentCount))
         ##("Sending" if receivedPacket else "ReSending"), packetSentCount))
@@ -258,10 +268,6 @@ while True:
         if DEBUG:
             print("packet[0:4] = '{0}', packet[4:6] = '{1}', packet[6:] = '{2}'".format(packet[0:4], packet[4:6], packet[6:]))
 
-        packetNumberIn = unpack(packet[0:4])
-        fromNodeAddress = unpack(packet[4:6])
-        packet = packet[6:]
-
         if packet.find("ACK") and packetNumberIn == packetSentCount:
             #   ACK packet
             acknowledged = True
@@ -278,8 +284,18 @@ while True:
             #   Add packet validation here
             #
 
-            packet_text = str(packet, 'ASCII')
-            print("Received (ASCII): '{0}'".format(packet_text))
+            #   Unpack the packet
+            sequenceNumberIn = unpack(outPacket[0:4])
+            fromNodeAddress = unpack(outPacket[4:6])
+            toNodeAddress = unpack(outPacket[6:8])
+            packetLenthIn = unpack(outPacket[8:9])
+            totalPacketsIn = unpack(outPacket[9:10])
+            subPacketNumberIn = unpack(outPacket[10:11])
+            payloadIn = outPacket[11:]
+
+            #   Decode the payload
+            payload_text = str(payloadIn, 'ASCII')
+            print("Received (ASCII): '{0}'".format(payloadIn_text))
 
             sleep(0.2)
 
